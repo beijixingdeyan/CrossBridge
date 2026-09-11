@@ -1,10 +1,11 @@
 import { motion } from 'framer-motion'
-import { LayoutDashboard, Container, Palette, Layers, Cpu, Share2, Shield, Store, Activity, Smartphone, Tablet, Watch } from 'lucide-react'
+import { LayoutDashboard, Container, Palette, Layers, Cpu, Share2, Shield, Store, Activity, Smartphone, Tablet, Watch, MonitorSmartphone } from 'lucide-react'
 import { useStore } from '../store'
 import type { HostOS } from '../store'
 
 const nav = [
   { id: 'dashboard', label: '总览', icon: LayoutDashboard },
+  { id: 'cloudphone', label: '云手机·真机', icon: MonitorSmartphone },
   { id: 'containers', label: '容器管理', icon: Container },
   { id: 'apps', label: '应用商店', icon: Store },
   { id: 'graphics', label: '图形桥接', icon: Palette },

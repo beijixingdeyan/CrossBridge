@@ -8,9 +8,18 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "lint": "oxlint"
+    "lint": "oxlint",
+    "server": "node server/index.js",
+    "server:dev": "node --watch server/index.js",
+    "cap:sync": "npx cap sync",
+    "cap:open:android": "npx cap open android",
+    "cap:open:ios": "npx cap open ios"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.1",
+    "@capacitor/cli": "^8.5.1",
+    "@capacitor/core": "^8.5.1",
+    "@capacitor/ios": "^8.5.1",
     "framer-motion": "^12.23.0",
     "lucide-react": "^0.525.0",
     "react": "^19.2.8",

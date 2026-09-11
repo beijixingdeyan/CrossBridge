@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">CrossBridge</string>
+    <string name="title_activity_main">CrossBridge</string>
+    <string name="package_name">dev.crossbridge.app</string>
+    <string name="custom_url_scheme">dev.crossbridge.app</string>
+</resources>

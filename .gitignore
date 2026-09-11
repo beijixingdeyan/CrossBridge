@@ -31,6 +31,14 @@ crossbridge_project.md
 .vite
 .turbo
 
+# CrossBridge runtime
+server/uploads/
+server/node_modules/
+android/app/build/
+android/.gradle/
+ios/App/build/
+ios/App/Pods/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

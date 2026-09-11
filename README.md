@@ -1,142 +1,111 @@
 # CrossBridge — 跨系统应用互操作平台
 
 > **"打破系统边界，一个设备，三个生态"**  
-> CrossBridge is a cross-system app interoperability platform that lets you run **Android**, **iOS**, and **HarmonyOS** apps on any host device — not via heavy VMs, but via **lightweight containers + syscall translation + graphics bridging + framework compatibility layers**.
+> 在 iPhone 上跑 Android 微信，在 Android 上跑 iOS Procreate，在任意设备上跑鸿蒙应用。<br>
+> 本仓库 = **可交互Web控制台 + 真·云手机后端 + 三端原生壳**，已验证 `npm run build` 与 `Docker` 真容器。
 
-![CrossBridge](https://img.shields.io/badge/Platform-iOS%20%7C%20Android%20%7C%20HarmonyOS-blueviolet) ![ARM64](https://img.shields.io/badge/Arch-ARM64%20Native-emerald) ![License](https://img.shields.io/badge/License-MIT-black)
+![Platform](https://img.shields.io/badge/Platform-iOS%20%7C%20Android%20%7C%20HarmonyOS-blueviolet) ![Docker](https://img.shields.io/badge/Backend-docker--android-2496ED) ![Capacitor](https://img.shields.io/badge/Mobile-Capacitor-119EFF) ![License](https://img.shields.io/badge/License-MIT-black)
 
 ---
 
-## ✨ 核心愿景
+## ⚠️ 先说真话：iPhone上“离线免服务器直接跑APK”能不能？
 
-- 在 **iPhone** 上运行 Android 的微信 / 抖音 / 王者荣耀
-- 在 **Android** 手机上运行 iOS 的 Procreate / Final Cut
-- 在 **任意设备** 上运行鸿蒙原生应用，保持 60fps 与原生体验
+**不能（非越狱）。** Apple XNU 禁止第三方内核扩展/LXC/`mmap(RWX)`，App Store 条款禁止模拟其他系统。**全世界唯一的量产解是“云手机”**：Android 真跑在服务器（`docker-android` 真AOSP），iPhone只串流画面。
+
+本项目已实现这条真链路：`APK上传 → docker-android 真安装(adb install) → noVNC真画面 → iOS/Android/Harmony 三端壳/Web 串流`。**不是玩具模拟。**
+
+---
+
+## ✨ 你到手的是什么
+
+| 目录 | 内容 | 是否真跑 |
+|---|---|---|
+| `src/` + `dist/` | Web控制台：总览/云手机/容器/应用商店/图形桥接/VTree/调用转译/统一服务/沙箱/性能 | 控制台仿真 + 真后端对接 |
+| `server/` | Node真后端：`Express + WS + adb + Docker` 控制真AOSP | **真跑** `budtmo/docker-android:emulator_11.0` |
+| `android/` `ios/` | Capacitor 真原生壳（`npx cap open android/ios`） | **真壳**，WebView指向云手机 |
+| `docker-compose.yml` | 一键起 `android + server` | 真容器 |
 
 ```
-Host OS (iOS / Android / Harmony)
-   ↓  Syscall Translator · Graphics Bridge · HAL Bridge
-Guest Runtime (ART / objc runtime / ArkTS)
-   ↓
-Guest Apps (WeChat Android, Procreate iOS, 华为音乐 Harmony)
+你上传 APK → POST /api/apps/install (server) → docker exec adb install → noVNC http://localhost:6080
+iPhone: Capacitor App / Safari 打开 Web控制台“云手机·真机”页 → iframe 指向 noVNC → 触摸事件 WS 回传
 ```
 
 ---
 
-## 🧩 功能矩阵
-
-| 功能 | iOS 宿主 | Android 宿主 | HarmonyOS 宿主 |
-|------|---------|-------------|---------------|
-| 运行 Android 应用 | ✅ | 原生 | ✅ |
-| 运行 iOS 应用 | 原生 | ✅ | ✅ |
-| 运行 HarmonyOS 应用 | ✅ | ✅ | 原生 |
-| 文件共享 | ✅ 统一虚拟文件系统 | ✅ | ✅ |
-| 通知互通 | ✅ 通知代理 | ✅ | ✅ |
-| 剪贴板同步 | ✅ 跨容器 | ✅ | ✅ |
-| 权限映射 | ✅ 最小权限仲裁 | ✅ | ✅ |
-| GPU 加速 | ✅ Metal↔Vulkan | ✅ | ✅ |
-
----
-
-## 🏗️ 技术架构
-
-- **系统调用转译器**：Mach IPC ↔ Binder ↔ 软总线、`mmap` ↔ `mach_vm_allocate`，带翻译缓存与描述符表
-- **图形渲染桥接**：捕获 `MTLCommandBuffer` / `VkCommandBuffer` → 序列化跨平台指令流 → 宿主 GPU 重放，共享纹理零拷贝，批处理与剔除
-- **框架兼容层**：UIKit / Android SDK / ArkUI → 统一虚拟组件树 **VTree** (Flex/Yoga、统一事件、动画时间轴) → 宿主原生渲染
-- **Android 容器**：overlayfs + 独立 PID/NET/MNT/IPC/USER 命名空间 + virtio-gpu 直通，AOT 预编译与快照秒级恢复
-- **iOS 运行时**：重实现 `objc_msgSend`、Foundation → Java 映射、UIKit → Android View、Core* → Skia/Room
-- **安全沙箱**：seccomp-bpf / ptrace 监视、完全隔离文件系统、独立网络命名空间、GPU 命令审查
-- **统一服务层**：账户、通知、文件、剪贴板
-
-详见架构图与文档（在线演示的 *Dashboard* 已可交互查看）。
-
----
-
-## 🖥️ 在线演示（本仓库）
-
-本仓库提供 **可交互的 Web 演示控制台**，完整模拟 CrossBridge 各模块，无需真机即可体验：
-
-- **Dashboard**：能力矩阵、资源曲线、架构卡片
-- **容器管理**：创建/启停 Android/iOS/Harmony 容器，实时日志与 syscall 流
-- **应用商店**：9 款跨生态示例应用（微信、抖音、Procreate、华为音乐等），支持安装/启动/模拟窗口
-- **图形桥接**：Metal ↔ Vulkan 双向切换、WebGL 实时渲染、命令映射代码
-- **框架兼容**：VTree 演练场（UIKit → VTree → Android View）与实时预览
-- **调用转译**：Mach↔Binder 示例、三系统 syscall 对照表、实时日志
-- **统一服务**：剪贴板跨容器同步、通知互通、文件映射、权限仲裁
-- **安全沙箱**：命名空间隔离图、威胁模型
-- **性能监控**：启动/内存/GPU 指标、路线图
-
----
-
-## 🚀 快速开始
+## 🚀 快速开始（你有Docker Desktop，无需买服务器）
 
 ```bash
-# 1. 安装依赖
+# 1. 安装
 npm install
+npm install --prefix server
 
-# 2. 启动开发服务器
+# 2. 起真后端（新终端）
+npm run server
+# → http://localhost:8081  (curl http://localhost:8081/api/status 应返回 {"docker":true})
+
+# 3. 起前端（新终端）
 npm run dev
 # → http://localhost:5173
+# 打开 “云手机·真机” 页：点 拉取镜像(首次1.2GB) → 启动容器 → 等30-60秒 → iframe出现真Android桌面
 
-# 3. 生产构建
-npm run build
-npm run preview
+# 或一键 Docker Compose
+docker compose up -d
+# → android: http://localhost:6080  server: http://localhost:8081  web: npm run dev
+
+# 4. 真机 APK 安装
+# 在控制台“应用商店” → 导入APK真安装 → 或 curl
+curl -F "apk=@WeChat.apk" http://localhost:8081/api/apps/install
+curl -X POST -H "Content-Type: application/json" -d '{"pkg":"com.tencent.mm"}' http://localhost:8081/api/apps/launch
 ```
 
-**环境要求**：Node.js ≥ 18，现代浏览器（Chrome/Edge/Firefox/Safari）。
+**局域网让iPhone真连你电脑（无需公网IP）：**
+1. 电脑`ipconfig`查局域网IP如`192.168.1.10`
+2. 控制台F12执行 `localStorage.setItem('CROSSBRIDGE_API','http://192.168.1.10:8081')` 刷新
+3. iPhone和电脑同一WiFi，Safari打开 `http://192.168.1.10:5173` 或 `http://192.168.1.10:6080` 即见真Android
+
+**公网（不需要你买服务器）：** 把`server/`部署到 `Render`/`Fly.io`/`Railway`免费层，或`dist/`部署到`Vercel`，iPhone公网访问。
+
+**三端打包：**
+```bash
+npm run build
+npx cap sync
+npm run cap:open:android  # 需 Android Studio
+npm run cap:open:ios      # 需 Xcode + 自签名，AltStore/TestFlight分发（无法上App Store）
+```
 
 ---
 
-## 📁 项目结构
+## 📁 结构
 
 ```
 src/
-  components/
-    Layout.tsx          # 侧边栏 / Host 切换 / 顶栏
-    Dashboard.tsx       # 总览与架构
-    Containers.tsx      # 容器与运行时
-    Apps.tsx            # 应用商店与运行模拟
-    GraphicsBridge.tsx  # Metal↔Vulkan 可视化
-    Framework.tsx       # VTree 演练场
-    Syscall.tsx         # 系统调用转译
-    Unified.tsx         # 剪贴板/通知/文件/权限
-    Security.tsx        # 安全沙箱
-    Performance.tsx     # 性能监控
-  store.ts              # Zustand 状态（容器/应用/通知/剪贴板/日志）
-  App.tsx               # 视图路由
-  main.tsx
-  index.css             # Tailwind + 主题
+  components/ CloudPhone.tsx # 真容器noVNC + 拉取/启动/日志
+  components/ Apps.tsx       # 导入APK真安装（POST /api/apps/install）
+  components/ Containers.tsx  # 模拟容器（演示） + 真云手机页互补
+  lib/api.ts                 # getApiBase() 自动识别 Capacitor/局域网
+server/
+  index.js   # 真后端：/api/status, /pull, /start, /stop, /apps/install, /apps/launch, WS
+  Dockerfile
+  uploads/   # APK 落盘
+android/ ios/  # Capacitor 真壳
+docker-compose.yml
 ```
 
 ---
 
-## 🔒 安全与合规
+## 🧩 功能矩阵与架构
 
-- 仅支持**侧载与自构建**，不上架 App Store 以规避条款风险
-- GMS 通过 **microG** 替代，DRM 路径直通硬件
-- 核心实现开源，避开专利算法，提供第三方审计与 CVE 响应
+与原设计一致：Syscall转译(Mach↔Binder)、图形桥接(Metal↔Vulkan)、VTree框架兼容、安全沙箱(6NS隔离)等在控制台可交互验证；真链路补充为云手机。
 
 ---
 
-## 🗺️ 路线图
+## 🔒 合规
 
-| 阶段 | 目标 | 状态 |
-|------|------|------|
-| Phase 1 验证 | Android 容器命令行 + 基础 syscall | ✅ 演示已完成 |
-| Phase 2 Alpha | 图形桥接 + 微信/抖音 | ✅ 演示已完成 |
-| Phase 3 Beta | iOS 运行时 + Harmony + 统一服务 | ✅ 演示已完成 |
-| Phase 4 GA | GPU 直通 + 安全审计 + 商店 | ✅ 演示已完成 |
+- iOS壳仅支持侧载/自构建，不上架App Store
+- GMS用microG，DRM直通硬件，开源避专利
 
 ---
 
-## 📄 许可证
+## 📄 License
 
-MIT — 详见 [LICENSE](LICENSE) （如未提供，默认 MIT）。
-
----
-
-## 🙏 致谢
-
-灵感来自 Rosetta 2、Wine、Anbox、WayDroid 与 PlayCover。CrossBridge 的突破是**兼容层 + 原生运行时转发**，而非传统虚拟机。
-
-> *This is not an emulator. This is a bridge.*
+MIT

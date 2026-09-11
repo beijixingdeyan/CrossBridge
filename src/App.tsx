@@ -8,6 +8,7 @@ import { Unified } from './components/Unified'
 import { Security } from './components/Security'
 import { Apps } from './components/Apps'
 import { Performance } from './components/Performance'
+import { CloudPhone } from './components/CloudPhone'
 import { useStore } from './store'
 
 export default function App() {
@@ -20,6 +21,7 @@ export default function App() {
         <MobileNav />
         <main className="flex-1 p-4 lg:p-6 max-w-[1400px] mx-auto w-full">
           {view === 'dashboard' && <Dashboard />}
+          {view === 'cloudphone' && <CloudPhone />}
           {view === 'containers' && <Containers />}
           {view === 'apps' && <Apps />}
           {view === 'graphics' && <GraphicsBridge />}

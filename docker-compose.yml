@@ -1,0 +1,29 @@
+services:
+  android:
+    image: budtmo/docker-android:emulator_11.0
+    container_name: crossbridge-android
+    privileged: true
+    ports:
+      - "6080:6080"   # noVNC
+      - "5554:5554"
+      - "5555:5555"
+    environment:
+      - EMULATOR_ARGS=-verbose -no-window -gpu swiftshader_indirect -no-snapshot -no-audio -no-boot-anim
+      - DEVICE=Samsung Galaxy S10
+    # 首次拉取约1.2GB，启动约45秒
+    restart: unless-stopped
+
+  server:
+    build: ./server
+    image: crossbridge-server
+    container_name: crossbridge-server
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./server/uploads:/app/uploads
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - android
+    environment:
+      - PORT=8081
+      - ANDROID_CONTAINER=crossbridge-android

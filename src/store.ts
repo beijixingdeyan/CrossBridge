@@ -62,7 +62,7 @@ export interface SyscallLog {
   time: string
 }
 
-type View = 'dashboard' | 'containers' | 'graphics' | 'framework' | 'syscall' | 'unified' | 'security' | 'apps' | 'performance'
+type View = 'dashboard' | 'containers' | 'graphics' | 'framework' | 'syscall' | 'unified' | 'security' | 'apps' | 'performance' | 'cloudphone'
 
 interface State {
   hostOS: HostOS

@@ -1,7 +1,8 @@
-import { useState } from 'react'
-import { Search, Play, Square, Download, Star, Filter } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { Search, Play, Square, Download, Star, Upload } from 'lucide-react'
 import { useStore } from '../store'
 import type { GuestApp } from '../store'
+import { getApiBase } from '../lib/api'
 
 const categories = ['全部', 'social', 'creative', 'game', 'productivity', 'media'] as const
 
@@ -11,6 +12,26 @@ export function Apps() {
   const [cat, setCat] = useState('全部')
   const [origin, setOrigin] = useState<'all' | 'android' | 'ios' | 'harmony'>('all')
   const [selected, setSelected] = useState<GuestApp | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+  const [realApps, setRealApps] = useState<any[]>([])
+
+  const uploadApk = async (file: File) => {
+    setUploading(true)
+    const fd = new FormData()
+    fd.append('apk', file)
+    try {
+      const r = await fetch(getApiBase() + '/api/apps/install', { method: 'POST', body: fd })
+      const j = await r.json()
+      alert(j.real ? `真机已安装: ${j.app.package}` : `已保存: ${file.name} (容器未运行时为模拟)` )
+      // refresh real list
+      try { const s = await fetch(getApiBase() + '/api/apps').then(x => x.json()); setRealApps(s.apps || []) } catch {}
+    } catch (e: any) { alert('上传失败(请先启动server): ' + e.message) }
+    setUploading(false)
+  }
+  const launchReal = async (pkg: string) => {
+    try { const j = await fetch(getApiBase() + '/api/apps/launch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pkg }) }).then(x => x.json()); alert(j.real ? '已在真容器启动' : '模拟启动(请先启动容器)') } catch (e: any) { alert(e.message) }
+  }
 
   const filtered = apps.filter(a => {
     if (cat !== '全部' && a.category !== cat) return false
@@ -122,9 +143,27 @@ export function Apps() {
       )}
 
       <div className="rounded-2xl bg-gradient-to-r from-violet-600/20 to-indigo-600/20 border border-violet-500/20 p-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="text-sm"><b>预适配应用</b> · 一键安装 · 自动选择最优容器 <span className="text-white/50">· 支持本地 APK/IPA 侧载</span></div>
-        <button className="px-4 py-2 rounded-xl bg-white text-black font-bold text-sm flex items-center gap-2"><Filter size={14} /> 导入 APK / IPA</button>
+        <div className="text-sm"><b>真机侧载</b> · 上传任意APK真安装到云Android容器 <span className="text-white/50">· 需先启动server与容器</span></div>
+        <div className="flex gap-2 items-center">
+          <input ref={fileRef} type="file" accept=".apk" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) uploadApk(f) }} />
+          <button onClick={() => fileRef.current?.click()} disabled={uploading} className="px-4 py-2 rounded-xl bg-white text-black font-bold text-sm flex items-center gap-2 disabled:opacity-50"><Upload size={14} /> {uploading ? '上传中...' : '导入 APK 真安装'}</button>
+          <span className="text-xs text-white/40">后端: {getApiBase()}</span>
+        </div>
       </div>
+      {realApps.length > 0 && (
+        <div className="rounded-2xl bg-white/[0.04] border border-white/[0.06] p-4">
+          <div className="font-bold text-sm">真容器已安装（来自后端）</div>
+          <div className="grid md:grid-cols-2 gap-2 mt-2">
+            {realApps.map((a: any, i: number) => (
+              <div key={i} className="p-2.5 rounded-xl bg-black/20 border border-white/5 flex items-center gap-2 text-xs">
+                <span className="font-mono">{a.package}</span><span className="text-white/40 truncate">{a.name}</span>
+                <span className={`ml-auto px-2 py-1 rounded-full text-[10px] ${a.real ? 'bg-emerald-600 text-white' : 'bg-white/10'}`}>{a.real ? '真安装' : '模拟'}</span>
+                <button onClick={() => launchReal(a.package)} className="px-2 py-1 rounded-full bg-violet-600 text-white text-xs">启动</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
