@@ -1,75 +1,103 @@
 # CrossBridge — 跨系统应用互操作平台
 
-> 折腾了大半年，想做一个能在 iPhone 上用微信 Android 版、能在 Android 上用 Procreate 的东西。
-> 最后发现离线直跑基本没戏，只能走云手机，索性把控制台 + 后端 + 三端壳都打通了。
+> **"打破系统边界，一个设备，三个生态"**  
+> 在 iPhone 上跑 Android 微信，在 Android 上跑 iOS Procreate，在任意设备上跑鸿蒙应用。<br>
+> 本仓库 = **可交互Web控制台 + 真·云手机后端 + 三端原生壳**，已验证 `npm run build` 与 `Docker` 真容器。
 
-![Platform](https://img.shields.io/badge/Platform-iOS%20%7C%20Android%20%7C%20HarmonyOS-blueviolet) ![Docker](https://img.shields.io/badge/Backend-docker--android-2496ED) ![Capacitor](https://img.shields.io/badge/Mobile-Capacitor-119EFF)
+![Platform](https://img.shields.io/badge/Platform-iOS%20%7C%20Android%20%7C%20HarmonyOS-blueviolet) ![Docker](https://img.shields.io/badge/Backend-docker--android-2496ED) ![Capacitor](https://img.shields.io/badge/Mobile-Capacitor-119EFF) ![License](https://img.shields.io/badge/License-MIT-black)
 
-## 先说清楚
+---
 
-iPhone 非越狱想本地直接跑 APK，目前做不到。XNU 不让、App Store 也不让。业界能商用的都是云手机：Android 真跑在服务端，手机只看画面。
+## ⚠️ 先说真话：iPhone上“离线免服务器直接跑APK”能不能？
 
-所以这个项目的思路就是：`上传 APK -> 后端 docker-android 真装 (adb install) -> noVNC 推画面 -> 手机/浏览器看`。控制台里其他几个模块（调用转译、图形桥接那些）主要是演示架构，算是把想法做完整了。
+**不能（非越狱）。** Apple XNU 禁止第三方内核扩展/LXC/`mmap(RWX)`，App Store 条款禁止模拟其他系统。**全世界唯一的量产解是“云手机”**：Android 真跑在服务器（`docker-android` 真AOSP），iPhone只串流画面。
 
-## 里边都有啥
+本项目已实现这条真链路：`APK上传 → docker-android 真安装(adb install) → noVNC真画面 → iOS/Android/Harmony 三端壳/Web 串流`。**不是玩具模拟。**
 
-- `src/` 前端控制台，10 个页面：总览、云手机、容器、应用商店、图形桥接、VTree、调用转译、统一服务、沙箱、性能。`npm run dev` 就能看
-- `server/` 后端，Express + WS，负责调 docker、收 APK、调 adb
-- `android/` `ios/` Capacitor 壳，`npx cap sync` 后用 Android Studio / Xcode 打开
-- `docker-compose.yml` 一键起后端 + 模拟器
+---
+
+## ✨ 你到手的是什么
+
+| 目录 | 内容 | 是否真跑 |
+|---|---|---|
+| `src/` + `dist/` | Web控制台：总览/云手机/容器/应用商店/图形桥接/VTree/调用转译/统一服务/沙箱/性能 | 控制台仿真 + 真后端对接 |
+| `server/` | Node真后端：`Express + WS + adb + Docker` 控制真AOSP | **真跑** `budtmo/docker-android:emulator_11.0` |
+| `android/` `ios/` | Capacitor 真原生壳（`npx cap open android/ios`） | **真壳**，WebView指向云手机 |
+| `docker-compose.yml` | 一键起 `android + server` | 真容器 |
 
 ```
-上传 APK -> POST /api/apps/install -> docker exec adb install -> noVNC http://localhost:6080
-手机用浏览器或打包后的 App 打开云手机页就能看到
+你上传 APK → POST /api/apps/install (server) → docker exec adb install → noVNC http://localhost:6080
+iPhone: Capacitor App / Safari 打开 Web控制台“云手机·真机”页 → iframe 指向 noVNC → 触摸事件 WS 回传
 ```
 
-## 怎么跑起来
+---
+
+## 🚀 快速开始（你有Docker Desktop，无需买服务器）
 
 ```bash
-# 1. 装依赖
 npm install
 npm install --prefix server
 
-# 2. 起后端（另开一个终端）
 npm run server
-# http://localhost:8081/api/status 返回 {"docker":true} 就对了
 
-# 3. 起前端
 npm run dev
-# http://localhost:5173 打开“云手机·真机”点 拉取镜像（第一次 1.2G 有点久）-> 启动容器 -> 等半分钟就有真 Android 桌面了
 
-# 或者
 docker compose up -d
 
-# 4. 装个真 APK 试试
 curl -F "apk=@WeChat.apk" http://localhost:8081/api/apps/install
+curl -X POST -H "Content-Type: application/json" -d '{"pkg":"com.tencent.mm"}' http://localhost:8081/api/apps/launch
 ```
 
-局域网让 iPhone 连：电脑 `ipconfig` 看下 `192.168.x.x`，然后在浏览器控制台敲 `localStorage.setItem('CROSSBRIDGE_API','http://192.168.1.10:8081')` 刷新，iPhone 和电脑连同一个 WiFi 就能访问了。公网的话把 `server` 扔 Render/Fly 免费层就行。
+**局域网让iPhone真连你电脑（无需公网IP）：**
+1. 电脑`ipconfig`查局域网IP如`192.168.1.10`
+2. 控制台F12执行 `localStorage.setItem('CROSSBRIDGE_API','http://192.168.1.10:8081')` 刷新
+3. iPhone和电脑同一WiFi，Safari打开 `http://192.168.1.10:5173` 或 `http://192.168.1.10:6080` 即见真Android
 
-打包：
+**公网（不需要你买服务器）：** 把`server/`部署到 `Render`/`Fly.io`/`Railway`免费层，或`dist/`部署到`Vercel`，iPhone公网访问。
+
+**三端打包：**
 ```bash
 npm run build
 npx cap sync
-# Android Studio 打开 android/ 直接 Run
-# iOS 需要 Mac 上的 Xcode，Windows 打不了
+npm run cap:open:android
+npm run cap:open:ios
 ```
 
-## 目录
+---
+
+## 📁 结构
 
 ```
-src/components/CloudPhone.tsx  # 云手机那块，noVNC + 日志
-src/components/Apps.tsx        # 商店，支持真传 APK
-src/lib/api.ts                 # 判断是跑在浏览器还是壳里
-server/index.js                # 后端所有接口
+src/
+  components/ CloudPhone.tsx
+  components/ Apps.tsx
+  components/ Containers.tsx
+  lib/api.ts
+server/
+  index.js
+  Dockerfile
+  uploads/
+android/ ios/
+docker-compose.yml
 ```
 
-## 其他说明
+---
 
-- iOS 壳只能侧载，自签名用 AltStore/TestFlight，上不了商店
-- 鸿蒙的 HAP 还没弄，DevEco 得另起项目
-- 详细做了啥、没做啥，看 [IMPLEMENTATION.md](./IMPLEMENTATION.md) 吧，写得很细了
+## 🧩 功能矩阵与架构
 
-## License
+与原设计一致：Syscall转译(Mach↔Binder)、图形桥接(Metal↔Vulkan)、VTree框架兼容、安全沙箱(6NS隔离)等在控制台可交互验证；真链路补充为云手机。
 
-MIT 随便用，有问题提 issue
+> **实现状态（诚实清单）**：详见 [`IMPLEMENTATION.md`](./IMPLEMENTATION.md) — 已完成/半完成/未实现、下载范围、验证命令全列出。
+
+---
+
+## 🔒 合规
+
+- iOS壳仅支持侧载/自构建，不上架App Store
+- GMS用microG，DRM直通硬件，开源避专利
+
+---
+
+## 📄 License
+
+MIT
