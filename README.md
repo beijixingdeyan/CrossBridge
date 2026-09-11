@@ -97,6 +97,8 @@ docker-compose.yml
 
 与原设计一致：Syscall转译(Mach↔Binder)、图形桥接(Metal↔Vulkan)、VTree框架兼容、安全沙箱(6NS隔离)等在控制台可交互验证；真链路补充为云手机。
 
+> **实现状态（诚实清单）**：详见 [`IMPLEMENTATION.md`](./IMPLEMENTATION.md) — 已完成/半完成/未实现、下载范围、验证命令全列出。
+
 ---
 
 ## 🔒 合规

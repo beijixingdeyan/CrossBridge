@@ -11,6 +11,7 @@ const app = express();
 const PORT = process.env.PORT || 8081;
 const ANDROID_CONTAINER = process.env.ANDROID_CONTAINER || 'crossbridge-android';
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
+const DOCKER_BIN = process.env.DOCKER_BIN || 'docker'; // 使用环境变量覆盖，默认走 PATH 中的 docker
 
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
@@ -44,12 +45,11 @@ function execCmd(cmd, opts = {}) {
 }
 
 async function dockerAvailable() {
-  try { await execCmd('"C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe" version'); return true; }
-  catch { try { await execCmd('docker version'); return true; } catch { return false; } }
+  try { await execCmd(`${DOCKER_BIN} version`); return true; }
+  catch { return false; }
 }
 function dockerCmd(cmd) {
-  // try full path first then bare
-  return `"C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe" ${cmd}`;
+  return `${DOCKER_BIN} ${cmd}`;
 }
 
 // ---- API ----
@@ -81,7 +81,7 @@ app.post('/api/android/pull', async (req, res) => {
   androidStatus = 'pulling';
   log('开始拉取 budtmo/docker-android:emulator_11.0 (约1.2GB, 首次较慢)...');
   try {
-    const p = spawn('C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe', ['pull', 'budtmo/docker-android:emulator_11.0'], { shell: true });
+    const p = spawn(DOCKER_BIN, ['pull', 'budtmo/docker-android:emulator_11.0'], { shell: true });
     p.stdout.on('data', d => log(d.toString().trim()));
     p.stderr.on('data', d => log(d.toString().trim()));
     p.on('close', code => {
@@ -99,13 +99,11 @@ app.post('/api/android/start', async (req, res) => {
   androidStatus = 'starting';
   log('启动 Android 容器 ' + ANDROID_CONTAINER + ' ...');
   try {
-    // remove old
     try { await execCmd(`${dockerCmd(`rm -f ${ANDROID_CONTAINER}`)}`); } catch {}
     const cmd = dockerCmd(`run -d --name ${ANDROID_CONTAINER} -p 6080:6080 -p 5554:5554 -p 5555:5555 --privileged budtmo/docker-android:emulator_11.0`);
     const out = await execCmd(cmd);
     log('容器已启动 ' + out.slice(0, 12));
     androidStatus = 'running';
-    // wait for boot
     setTimeout(() => log('等待 AOSP 启动 (约30-60s)... 可打开 http://localhost:6080 查看 noVNC'), 2000);
     res.json({ ok: true, id: out });
   } catch (e) {
@@ -132,13 +130,11 @@ app.post('/api/apps/install', upload.single('apk'), async (req, res) => {
   const dest = path.join(UPLOAD_DIR, orig);
   fs.renameSync(req.file.path, dest);
   log(`收到 APK ${orig} (${(fs.statSync(dest).size / 1024 / 1024).toFixed(1)} MB)`);
-  // try real adb install if container running
   let installed = false;
   try {
     await execCmd(`${dockerCmd(`exec ${ANDROID_CONTAINER} adb install -r /tmp/${orig}`)}`);
     installed = true;
   } catch (e) {
-    // fallback: copy into container then install
     try {
       await execCmd(`${dockerCmd(`cp "${dest}" ${ANDROID_CONTAINER}:/tmp/${orig}`)}`);
       await execCmd(`${dockerCmd(`exec ${ANDROID_CONTAINER} adb install -r /tmp/${orig}`)}`);
@@ -161,7 +157,6 @@ app.post('/api/apps/launch', async (req, res) => {
   if (!pkg) return res.status(400).json({ ok: false });
   log(`启动应用 ${pkg} ...`);
   try {
-    // try real monkey launch
     await execCmd(`${dockerCmd(`exec ${ANDROID_CONTAINER} adb shell monkey -p ${pkg} -c android.intent.category.LAUNCHER 1`)}`);
     log(`${pkg} 已在容器内启动`);
     broadcast({ type: 'app_launch', pkg, real: true });
@@ -173,7 +168,6 @@ app.post('/api/apps/launch', async (req, res) => {
   }
 });
 
-// noVNC proxy hint
 app.get('/api/novnc', (req, res) => res.json({ url: 'http://localhost:6080', ws: 'ws://localhost:6080/websockify' }));
 
 app.use(express.static(path.join(__dirname, '..', 'dist')));
