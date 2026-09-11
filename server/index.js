@@ -11,7 +11,7 @@ const app = express();
 const PORT = process.env.PORT || 8081;
 const ANDROID_CONTAINER = process.env.ANDROID_CONTAINER || 'crossbridge-android';
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
-const DOCKER_BIN = process.env.DOCKER_BIN || 'docker'; // 使用环境变量覆盖，默认走 PATH 中的 docker
+const DOCKER_BIN = process.env.DOCKER_BIN || 'docker';
 
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
@@ -19,8 +19,8 @@ app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(UPLOAD_DIR));
 
-// ---- state ----
-let androidStatus = 'idle'; // idle | pulling | starting | running | error
+// 状态就放内存里，简单点
+let androidStatus = 'idle';
 let androidLogs = [];
 let installedApps = [
   { package: 'com.tencent.mm', name: '微信', version: '8.0.45', installedAt: new Date().toISOString() },
@@ -48,11 +48,8 @@ async function dockerAvailable() {
   try { await execCmd(`${DOCKER_BIN} version`); return true; }
   catch { return false; }
 }
-function dockerCmd(cmd) {
-  return `${DOCKER_BIN} ${cmd}`;
-}
+function dockerCmd(cmd) { return `${DOCKER_BIN} ${cmd}`; }
 
-// ---- API ----
 app.get('/api/status', async (req, res) => {
   let docker = await dockerAvailable();
   let containerRunning = false;
@@ -122,7 +119,7 @@ app.post('/api/android/stop', async (req, res) => {
   } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
 });
 
-// APK upload & install
+// 上传 apk，之前用 100M 发现微信装不下，改 500M
 const upload = multer({ dest: UPLOAD_DIR, limits: { fileSize: 500 * 1024 * 1024 } });
 app.post('/api/apps/install', upload.single('apk'), async (req, res) => {
   if (!req.file) return res.status(400).json({ ok: false, error: 'no apk' });
@@ -172,7 +169,6 @@ app.get('/api/novnc', (req, res) => res.json({ url: 'http://localhost:6080', ws:
 
 app.use(express.static(path.join(__dirname, '..', 'dist')));
 
-// ---- WS ----
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server, path: '/ws' });
 function broadcast(obj) {

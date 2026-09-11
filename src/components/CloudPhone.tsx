@@ -21,7 +21,7 @@ export function CloudPhone() {
   useEffect(() => {
     refresh()
     const id = setInterval(refresh, 3000)
-    // ws for live logs
+    // 连 ws 推日志，失败就算了
     let ws: WebSocket | null = null
     try {
       const base = getApiBase().replace('http', 'ws')

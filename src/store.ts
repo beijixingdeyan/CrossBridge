@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 
+// 本来想用 redux，太重了，还是 zustand 简单
 export type HostOS = 'ios' | 'android' | 'harmony'
 export type GuestOS = 'android' | 'ios' | 'harmony'
 export type ContainerStatus = 'stopped' | 'starting' | 'running' | 'error' | 'paused'
